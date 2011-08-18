@@ -59,8 +59,8 @@ module Lossfully
 
       raise "Converting from multiple directories is not supported" if primary.kind_of? Array
       raise "Writing to multiple directories is not supported" if target.kind_of? Array
-      primary = File.expand_path primary
-      target = File.expand_path target
+      primary = File.expand_path primary, File.dirname($0)
+      target = File.expand_path target, File.dirname($0)
 
       raise "Overwriting original library not supported." if primary == target
 
@@ -74,30 +74,30 @@ module Lossfully
       end
 
       actions = []
-      resulting_files = []
-      resulting_directories = []
+      files_to_keep = []
 
       Find.find(primary) do |file|
         next if File.directory? file
         
         encoding = self.class.determine_rule @encode_rules, file
+        encoding = Array(encoding) unless encoding.kind_of? Array
         next if encoding[0] == :skip
         path = determine_path file, primary, target, encoding
-        resulting_files << path
+        files_to_keep << path
 
         if File.exist? path
           clobber = self.class.determine_rule @clobber_rules, file
-          next if clobber == false
+          next unless clobber # if clobber == false
           if clobber.kind_of? String
             path = path.chomp(File.extname(path)) + clobber + File.extname(path)
-            resulting_files << path
+            files_to_keep << path
           elsif clobber == :rename
-            i = '_1'
+            i = '1'
             begin
-              new_path = path.chomp(File.extname(path)) + i.succ! + File.extname(path)
+              new_path = path.chomp(File.extname(path)) + " (#{i.succ!})" + File.extname(path)
+              files_to_keep << new_path
             end while File.exist? new_path
             path = new_path
-            resulting_files << path
           end
         end
         
@@ -119,13 +119,13 @@ module Lossfully
         end
       end
 
-      resulting_files.uniq!
+      files_to_keep.uniq!
 
       Find.find(target) do |file|
         next if ! File.exist? file
         next if File.directory? file
         if self.class.determine_rule @remove_missing_rules, file
-          FileUtils.rm file unless resulting_files.include? file
+          FileUtils.rm file unless files_to_keep.include? file
         end
       end
 
@@ -173,11 +173,11 @@ module Lossfully
         output = arg.values.first
       else
         if block 
-          input = arg ? arg : default_input
+          input = !arg.nil? ? arg : default_input
           output = default_output
         else
           input = default_input
-          output = arg ? arg : default_output
+          output = !arg.nil? ? arg : default_output
         end
       end
       input = Array(input) unless input.kind_of? Array 
@@ -195,30 +195,35 @@ module Lossfully
       end
       raise "No output format specified." if !block && output.empty?
       if [:everything, :nonaudio] & input != []
-        raise unless ([:copy, :skip] & output != []) || block
-      end
-
-      sym = []; int = []; str = []; other = 0
-      output.each do |x| 
-        if x.kind_of? Symbol
-          sym << x
-        elsif x.kind_of? Numeric
-          int << x
-        elsif x.kind_of? String
-          str << x
-        else
-          other += 1
+        unless ([:copy, :skip] & output != []) || block
+          raise "only valid targets for :everything and :nonaudio are :copy and :skip" 
         end
       end
 
-      unless (sym.size == 1 && int.empty? && str.empty? && other == 0) || 
+      unless block 
+        sym = []; int = []; str = []; other = 0
+        output.each do |x| 
+          if x.kind_of? Symbol
+            sym << x
+          elsif x.kind_of? Numeric
+            int << x
+          elsif x.kind_of? String
+            str << x
+            else
+            other += 1
+          end
+        end
+      end
+
+      unless block || 
+        (sym.size == 1 && int.empty? && str.empty? && other == 0) || 
         (str.size + int.size >= 1 && str.size < 2 && int.size < 2 && other == 0 && sym.empty?)
         raise "Output format incorrectly specified."
-      end
-      if ! sym.empty? 
-        output = [sym[0]]
-      else
-        output = int.empty? ? [str[0]] : [str[0], int[0]]
+        if ! sym.empty? 
+          output = [sym[0]]
+        else
+          output = int.empty? ? [str[0]] : [str[0], int[0]]
+        end
       end
 
       input = InputRules.new(input, &block)

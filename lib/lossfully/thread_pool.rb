@@ -15,7 +15,7 @@ require 'timeout'
 # general form.  Then then ThreadPool can be initialized with a block
 # and you can just add objects to the task queue.
 #
-class ThreadPool
+class Lossfully::ThreadPool
 
   DEFAULT_BLOCK = lambda {|block, &blk| block = blk if block_given? ; block.call}
 
