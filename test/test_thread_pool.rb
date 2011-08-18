@@ -8,7 +8,7 @@ module TestLossfully
 
     def test_everything
       a = [] 
-      tp = ThreadPool.new(2)
+      tp = Lossfully::ThreadPool.new(2)
       tp.max_size = 3
       assert_equal 3, tp.max_size
       tp.process { a << 1}
@@ -22,7 +22,7 @@ module TestLossfully
 
     def test_everything_with_auto_blocks
       a = []
-      tp = ThreadPool.new(2) do |x|
+      tp = Lossfully::ThreadPool.new(2) do |x|
         a << x
       end
       tp << 1
@@ -35,7 +35,7 @@ module TestLossfully
     end
 
     def test_stop
-      tp = ThreadPool.new(2) 
+      tp = Lossfully::ThreadPool.new(2) 
       r1 = false
       r2 = false
       r3 = false
@@ -55,7 +55,7 @@ module TestLossfully
     end
 
     def test_kill
-      tp = ThreadPool.new(2) 
+      tp = Lossfully::ThreadPool.new(2) 
       r1 = false
       r2 = false
       r3 = false
