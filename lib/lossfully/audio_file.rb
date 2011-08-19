@@ -17,8 +17,8 @@ module Lossfully
       check_file path
 
       # system("soxi -V0 #{path}")
-      p = IO.popen("soxi -V0 #{options} \"#{path}\"")
       return nil if File.extname(path) == '.m3u'
+      p = IO.popen("soxi -V0 #{options} \"#{path}\"")
       return ((Process.wait2 p.pid)[1] == 0) ? p.gets.chomp : nil
     end
 
@@ -53,7 +53,6 @@ module Lossfully
     # does not recognize the file as audio, return nil.
     #
     def self.bitrate_kbps path
-      #(soxi_command path, '-D').to_f
       b = bitrate(path)
       return b.to_f * (b[-1..-1] == 'k' ? 1 : 1000)
     end
@@ -79,7 +78,12 @@ module Lossfully
 
     def initialize path
       @path = path
-      raise "Not recognized as an audio file: #{file}" unless is_audio?
+
+      # Actually, let's not do this.  This gets checked every time a
+      # method is run anyway, so this way we can just use the class as
+      # a wrapper around a path string for files that aren't audio.
+      #
+      # raise "Not recognized as an audio file: #{file}" unless is_audio?
     end
 
     attr_reader :path

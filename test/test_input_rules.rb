@@ -30,7 +30,7 @@ module TestLossfully
       assert r4.test f2
       assert r5.test f1
       assert r6.test f1
-      assert r6.test f1
+      assert r6.test f2
       assert ! (r4.test f1)
       assert ! (r5.test f2)
 
@@ -56,18 +56,18 @@ module TestLossfully
       assert !(r2.test f1)
 
       r1 = Lossfully::InputRules.new do |f|
-        [:mp3] if File.dirname(f) == 'test/data' 
+        [:mp3] if File.dirname(f.path) == 'test/data' 
       end
       f1 = Lossfully::AudioFile.new 'test/data/so_sad.ogg'
       assert r1.test f1
       
       r1 = Lossfully::InputRules.new [:ogg, 100] do |f|
-        [:mp3] if File.dirname(f) == 'test/data' 
+        [:mp3] if File.dirname(f.path) == 'test/data' 
       end
       assert r1.test f1
 
       r1 = Lossfully::InputRules.new [:ogg, 128] do |f|
-        [:mp3] if File.dirname(f) == 'test/data' 
+        [:mp3] if File.dirname(f.path) == 'test/data' 
       end
       assert !(r1.test f1)
     end
@@ -118,7 +118,7 @@ module TestLossfully
 
       r1 = Lossfully::InputRules.new [:ogg, 192]
       r2 = Lossfully::InputRules.new [:ogg, /a/]
-      assert r1 < r2
+      assert r2 < r1
     end
 
   end

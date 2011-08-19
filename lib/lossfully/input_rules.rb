@@ -26,36 +26,36 @@ module Lossfully
     attr_reader :block, :extension, :regexp, :type, :max_bitrate
 
     def test file_or_path
-      if file_or_path.kind_of? AudioFile
-        file = file_or_path
-      else
-        path = file_or_path
-        if AudioFile.is_audio? path
-          file = AudioFile.new path
-        else
-          return false unless [:everything, :nonaudio].include?(@type)
-          return false unless path =~ @regexp
-          (return block.call(path)) if @block
-          return true
-        end
-      end
-      
+      file = if file_or_path.kind_of? AudioFile
+               file_or_path
+             else
+               AudioFile.new(file_or_path)
+             end
+#      unless file.is_audio?
+#        return false unless [:everything, :nonaudio].include?(@type)
+#        return false unless file.path =~ @regexp
+#        (return block.call(file.path)) if @block
+#        return true
+#      end
+
       if @type != :everything
+        if [:audio, :lossy, :lossless].include? @type
+          return false unless file.is_audio?
+        end
+
         if @type == :lossy 
           return false if LOSSLESS_TYPES.include? file.type
         elsif @type == :lossless
           return false unless LOSSLESS_TYPES.include? file.type
-        elsif @type == :audio
-          return false unless file.is_audio?
         elsif @type == :nonaudio
           return false if file.is_audio?
-        else
+        elsif @type != :audio
           v = [:vorbis, :ogg]
           return false unless (file.type == @type) || 
             (v.include?(file.type) && v.include?(@type))
         end
       end
-      
+
       if @max_bitrate > 0 
         return false unless file.bitrate_kbps > @max_bitrate
       end
@@ -69,7 +69,9 @@ module Lossfully
       end
 
       if @block
-        return block.call(file.path)
+        # return block.call(file.path)
+        # TODO: decide if this should be file or file.path
+        return block.call(file)
       end
 
       return true
@@ -80,9 +82,15 @@ module Lossfully
       -1 * compare_strictness(x)
     end
 
-    # return -1 if self is less strict, 1 if x is more strict
+    # return -1 if self is less strict, 1 if self is more strict
     def compare_strictness x
       return nil unless x.class == self.class
+
+      if @regexp != x.regexp
+        return -1 if @regexp == //
+        return 1 if x.regexp == //
+        return nil
+      end
 
       if @type != x.type
         return -1 if @type == :everything
@@ -108,12 +116,6 @@ module Lossfully
       b = @max_bitrate <=> x.max_bitrate
       return b unless b == 0
       
-      if @regexp != x.regexp
-        return -1 if @regexp == //
-        return 1 if x.regexp == //
-        return nil
-      end
-
       if @block || x.block
         return nil if @block && x.block
         return -1 if ! @block

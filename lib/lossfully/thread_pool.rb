@@ -32,6 +32,8 @@ module Lossfully
       @queue = Queue.new
       @workers = []
       @master = master_thread
+      @completed = 0
+      @total = 0
     end
 
     def process (block_or_item=nil, &blk)
@@ -41,11 +43,16 @@ module Lossfully
       else
         @queue << lambda { @block.call(block_or_item) }
       end
-
+#      @mutex.synchronize { @total +=1 }
+      @total += 1
       signal_master
     end
 
-    attr_reader :max_size
+    def current
+      @total - @queue.size
+    end
+
+    attr_reader :max_size, :mutex, :completed, :total
     alias :enq :process
     alias :dispatch :process
     
@@ -96,14 +103,16 @@ module Lossfully
     def master_thread
       Thread.new do
         while @running || ! @queue.empty?
+
           @workers ||= []
           @workers.delete_if { |w| ! w.alive? }    
 
           while @workers.size < @max_size && @queue.size > 0 
             @workers << Thread.new do 
               begin
-                while task = @queue.pop(true) rescue nil
+                if task = @queue.pop(true) rescue nil
                   task.call
+                  @mutex.synchronize { @completed +=1 }
                 end 
               ensure
                 signal_master
@@ -116,7 +125,6 @@ module Lossfully
             begin
               Timeout::timeout(2) { @cv.wait(@mutex) }
             rescue Timeout::Error
-              nil
             end
           end
           # This needs to come after the critical section above,
