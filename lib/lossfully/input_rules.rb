@@ -1,6 +1,52 @@
+#--
+# Copyright (C) 2011 Don March
+#
+# This file is part of Lossfully.
+#
+# Lossfully is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#  
+# Lossfully is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see
+# <http://www.gnu.org/licenses/>.
+#++
+
 module Lossfully
   LOSSLESS_TYPES = %w(wav flac wv sox).map(&:to_sym)
 
+  # The InputRules class wraps up conditions and provides a way to
+  # test if a file meets those conditions.  It also allows the
+  # conditions to be sorted so that more restrictive conditions are
+  # tried before less restrictive.  The sorting hopefully does what
+  # seems natural; it looks at first at the regexp, then the file type
+  # (as returned by soxi -t), the file extension, the bitrate
+  # threshold, and finally if a block is given.  For example, the
+  # following encode rules are shown in the order that they would be
+  # tested against every file (even though the rules would be checked
+  # in this order even if the below encode statements were in a
+  # different order):
+  #
+  #   encode [:mp3, 128, /bach/] do 
+  #     ... 
+  #   end
+  #   encode [:mp3, 128, /bach/] => ...
+  #   encode [:mp3, /bach/] => ...
+  #   encode [:mp3, 128] => ...
+  #   encode :mp3 => ...
+  #   encode :lossy => ...
+  #   encode :audio => ...
+  #   encode :everything => ...
+  #
+  # It's obviously only a partial order; see the code for
+  # compare_strictness if you need to know exactly what it's doing.
+  #
   class InputRules
     include Comparable
 

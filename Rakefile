@@ -17,15 +17,10 @@ Bones do
   history_file 'CHANGELOG'
   readme_file  'README'
   rdoc.main    'README'
-  # summary ''
-  # description ''
+  summary 'Smartly generate transcoded (lossy or not) versions of your main music library.'
+  description 'Smartly generate transcoded (lossy or not) versions of your main music library.'
 
-  exclude %w(tmp$ bak$ ~$ CVS \.svn/ \.git/ \.brz/ \.bzrignore ^pkg/)
+  exclude %w(tmp$ bak$ ~$ CVS \.svn/ \.git/ \.brz/ \.bzrignore ^pkg/ ^coverage/)
   rdoc.include %w(README ^lib/ ^bin/ ^ext/ \.txt$ \.rdoc$)
-
-#  gem.extras[:post_install_message] = <<-MSG
-# -------
-# -------
-# MSG
 end
 

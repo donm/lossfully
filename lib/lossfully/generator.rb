@@ -1,14 +1,106 @@
+#--
+# Copyright (C) 2011 Don March
+#
+# This file is part of Lossfully.
+#
+# Lossfully is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#  
+# Lossfully is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see
+# <http://www.gnu.org/licenses/>.
+#++
+
 require 'find'
 require 'pathname'
 require 'erb'
 require 'fileutils'
 
 # TODO: test if necessary binaries are installed
-# TODO: test if soxi compiled with LAME
+# TODO: test if sox compiled with LAME
 # check and update metadata
 
 module Lossfully
+
+  # Lossfully works in a sort of declarative way of adding rules that
+  # match certain files and indicate what action to take on those
+  # files.  
+  #
+  # There are six main methods that are used to add rules for how to
+  # handle different types of files, and they all behave relatively
+  # similarly: encode, options, effect_options, path, clobber, and
+  # remove_missing. All of the rules created by a given method are
+  # collected as InputRules (which see) and are sorted in rough order
+  # of strictness.  When the generator is finally run, each rule is
+  # tried in succession (in order of strictness) until one matches the
+  # file, and that action is used.  Each method adds rules for how to
+  # encode files, except for remove_missing, which determines what
+  # pre-existing files to remove from the target directory upon
+  # completion.
+  #
+  # Each rule-making method takes a hash where the key specifies what
+  # files the new rule should apply to, and the value specifies what
+  # the action is.  The key part of the hash is a single object or an
+  # array of the following:
+  #
+  # * A symbol, which matches the type of the file as returned by
+  #   `soxi -t' (e.g., :vorbis) or a type class (:everything, :audio,
+  #   :nonaudio, :lossy, :lossless).  The symbol :ogg is treated as a
+  #   synonym for :vorbis.
+  #
+  # * A string that specifies a file extension to match.
+  #
+  # * A regular expression.
+  #
+  # * A number, which specifies the minimum bitrate in kbps a matching
+  #   file must have.
+  #
+  # The allowed values for the key specifying the action depends on
+  # the method.
+  #
+  # A rule can omit the key part of the hash and simply specify the
+  # rule, and a default will be used (:everything for clobber and
+  # remove_missing, :audio for the others).  
+  #
+  # A rule can also omit the value (action) part of the hash if a
+  # block is given.  The block must return nil or false when the rule
+  # does not apply to a file; otherwise the block should return the
+  # action to perform on the matching files.  An AudioFile instance
+  # will be yielded to the block regardless of whether the current
+  # file is actually audio or not.  See the documentation for
+  # AudioFile for available methods.
+  #
+  # So, for example, the following are possible uses of the encode
+  # method:
+  #
+  #    encode [:lossy, 320, /Bach/] => '.mp3'
+  #
+  #    encode [:lossy, 320, /Bach/] do
+  #      if # conditions here
+  #        ['.ogg', 6]
+  #      elsif # other conditions
+  #        ['.mp3', -192.2]
+  #      else
+  #        false
+  #      end
+  #    end
+  #
+  # The methods copy and skip are aliases for encode with :skip or
+  # :copy as the action.
+  #
+  # The methods quiet, threads, and rel_path just set options and do
+  # not create rules.
+  #
   class Generator
+
+    private
 
     def self.sort_by_rules array
       array.sort { |x,y| (x[0] <=> y[0]) rescue 0 }
@@ -27,6 +119,17 @@ module Lossfully
       return nil
     end
 
+    public
+
+    # Create a new Generator instance to store rules and run them.
+    # 
+    # If a block is given, yeild self if arity of block is 1,
+    # otherwise run instance_eval on the block.
+    #
+    # Normally you would just call Lossfully.generate (which is a
+    # wrapper around this and #generate) with a source
+    # library/playlist and a target.
+    #
     def initialize &block
       @encode_rules = Array.new
       @path_rules = Array.new
@@ -58,13 +161,21 @@ module Lossfully
     attr_accessor :verbosity
     attr_writer :rel_path, :threads
 
-    def threads arg=nil
-      if arg
-        @threads = arg
+    # Return the number of threads to use for encoding to n_threads,
+    # or set the number of threads to n_threads if called with an
+    # argument.
+    #
+    def threads n_threads=nil
+      if n_threads
+        @threads = n_threads
       end
       @threads
     end
 
+    # Return or set the relative path used when expanding the source
+    # and target directories.  The default is to expand relative to
+    # the script called on the command line, i.e. $0.
+    #
     def rel_path arg=nil
       if arg
         @rel_path = File.directory?(arg) ? arg : File.dirname(arg)
@@ -73,18 +184,34 @@ module Lossfully
       end
     end
 
+    # Turn on or off the progress for checking and acting on each
+    # file.
+    #
     def quiet bool=true
       @verbosity = bool ? 0 : 1
     end
 
-    # Print + "\n" is used instead of puts because sometimes two puts
-    # strings are printed together and then the newlines together.  I
-    # guess because of threading.
+    # Run the rules collected in this instance on every file in the
+    # source, placing the results in the target directory. Takes a
+    # pair of strings either as individual arguments or as a Hash,
+    # (see example below).  The source can be a directory or a playlist.
     #
-    def message str
-      print str + "\n" unless @verbosity == 0
-    end
-
+    # Normally you would just call Lossfully.generate (which is a
+    # wrapper around this and Generator.new) with a source
+    # library/playlist and a target.  But if you want to use the same
+    # rules on several directories or playlists, you can create the
+    # Generator once and then call #generate on it several times with
+    # different arguments
+    #
+    #   g = Lossfully::Generator new do
+    #     remove_missing false
+    #     encode :lossless => '.ogg'
+    #     # ...
+    #   end
+    #
+    #   g.generate 'dir1', 'target'
+    #   g.generate 'dir2' => 'target'
+    #  
     def generate *args
       if args.size == 1 then 
         hash = args[0]
@@ -145,7 +272,7 @@ module Lossfully
         files.uniq!
       else
         files = []
-        Find.find(primary) { |file| files << file unless File.directory? file}
+        Find.find(primary) { |f| files << f unless File.directory? f}
       end
 
       files.each_with_index do |file, file_index|
@@ -213,15 +340,25 @@ module Lossfully
       copy_actions.join
 
       files_to_keep.uniq!
-      Find.find(target) do |file|
-        next if ! File.exist? file
-        next if File.directory? file
-        if self.class.determine_rule @remove_missing_rules, file
-          FileUtils.rm file unless files_to_keep.include? file
+      Find.find(target) do |f|
+        next if ! File.exist? f
+        next if File.directory? f
+        if self.class.determine_rule @remove_missing_rules, f
+          FileUtils.rm f unless files_to_keep.include? f
         end
       end
 
       delete_empty_directories(target)
+    end
+
+    private
+    
+    # Print + "\n" is used instead of puts because sometimes two puts
+    # strings are printed together and then the newlines together.  I
+    # guess because of threading.
+    #
+    def message str
+      print str + "\n" unless @verbosity == 0
     end
 
     def delete_empty_directories directory
@@ -233,8 +370,6 @@ module Lossfully
       end
     end
 
-    private
-    
     def determine_path audiofile_or_path, primary, target, encoding
       file = audiofile_or_path.kind_of?(AudioFile) ? audiofile_or_path.path : audiofile_or_path
 
@@ -282,6 +417,24 @@ module Lossfully
 
     public
 
+    # Set a rule for how to encode a matching file.  See the common
+    # documentation for Generator for input format.  The action is a
+    # single object or an array consiting of a string indicating the
+    # new extension of the encoded file, and/or a number which is
+    # passed as the compression/quality level (see the -C,
+    # --compression option in the man pages for sox and soxformat).
+    # 
+    # Normally a matched file will not be reencoded if the output is
+    # to have the same file extension, unless a specific compression
+    # level is given as well; then it will be reencoded.
+    #
+    # To force a file to be reencoded at the default compression level
+    # (for example, in order to update changed metadata) use the
+    # symbol :reencode as the rule.
+    #
+    # Alternatively, the rule can be either :copy or :skip, which have
+    # the obvious result.
+    #
     def encode arg=[], &block
       input, output = separate_input arg, [:audio], [], &block
       output = Array(output) unless output.kind_of? Array 
@@ -330,14 +483,27 @@ module Lossfully
       @encode_rules << [input, output]
     end
 
+    # An alias to encode using :skip as the action.
+    #
+    #   gencode  
+    #
     def skip arg=[]
       encode(arg=>:skip)
     end
 
+    # An alias to encode using :copy as the action.
+    #
+    #
     def copy arg=[]
       encode(arg=>:copy)
     end
 
+    # Currently not implemented.
+    #
+    # Set a rule for what path to use for the output of a matched
+    # file.  See the common documentation for Generator for input
+    # format. 
+    #
     def path arg=[], &block
       # TODO: implement configurable paths
       input, output = separate_input arg, [:audio], '', &block
@@ -353,6 +519,10 @@ module Lossfully
       @path_rules << [input, output]
     end
 
+    # Set a rule for what option string to pass to sox for matched
+    # files.  See the common documentation for Generator for input
+    # format. See man page for sox for available options.
+    #
     def options arg=[], &block
       input, output = separate_input arg, [:audio], '', &block
       raise "Output path incorrectly specified." unless block || output.kind_of?(String)
@@ -363,6 +533,10 @@ module Lossfully
       @option_rules << [input, output]
     end
 
+    # Set a rule for what effect option string to pass to sox for
+    # matched files.  See the common documentation for Generator for
+    # input format.  See man page for sox for available options.
+    #
     def effect_options arg=[], &block
       input, output = separate_input arg, [:audio], '', &block
       raise "Effect incorrectly specified." unless block || output.kind_of?(String)
@@ -373,6 +547,19 @@ module Lossfully
       @effect_option_rules << [input, output]
     end
 
+    # Set a rule for whether to write over an existing file.  The rule
+    # is matched against the *input* filename, not the output. See the
+    # common documentation for Generator for input format.
+    #
+    # The action part of the input can be True or False, the symbol
+    # :rename, or a string.  If the action for a matched file is True,
+    # any existing file will be overwritten.  If False, the file will
+    # be silently skipped.  If :rename, a numbered suffix will be
+    # appended if necessary to create a unique name.  If a string is
+    # given, that string will be appended to the filename (before the
+    # extension) if necessary to avoid writing over a file; however
+    # anything with that new filename will be silently overwritten.
+    #
     def clobber arg=[], &block
       input, output = separate_input arg, [:everything], true, &block
       raise "Effect incorrectly specified." unless block ||
@@ -383,6 +570,13 @@ module Lossfully
       @clobber_rules << [input, output]
     end
 
+    # Set a rule for whether to remove a file from the target
+    # directory if there was no file in the source directory or
+    # playlist to generate it.  The rule is matched against the *
+    # filename, not the output. See the common documentation for
+    # Generator for input format.  Action values should be True or
+    # False.
+    #
     def remove_missing arg=[], &block
       input, output = separate_input arg, [:everything], true, &block
       raise "Effect incorrectly specified." unless block ||
@@ -392,14 +586,15 @@ module Lossfully
       @remove_missing_rules.delete_if { |x| x[0] == input }
       @remove_missing_rules << [input, output]
     end
-
   end
 
+  # Create a new Generator instance, yield it to the block (or call
+  # instance_eval, if arity==0), and then call generate on the instance.
+  #
   def self.generate *args, &block
     g = Generator.new(&block)
     g.generate(*args)
   end
-
 end
 
 # tp = ThreadPool.new(2)

@@ -1,60 +1,96 @@
-lossfully
-===========
+= lossfully
 
-FIXME (describe your package)
+Smartly generate transcoded (lossy or otherwise) versions of your main music
+library. 
 
-Features
---------
+== Examples
 
-* FIXME (list of features and unsolved problems)
+This is not your average, "drag a bunch of folders on me and press go"
+audio converter.  You need to write a file that points to your library
+and describes how you want to generate a second library.  Let's start
+with:
 
-Examples
---------
+    require 'lossfully'
 
-    FIXME (code sample of usage)
+    Lossfully.generate '~/share/music/' => '~/share/music_lossy' do 
+      encode '.ogg'
+    end 
 
-Requirements
-------------
+That will copy everything from ~/share/music to ~/share/music_lossy,
+encoding all of the non-vorbis audio files to vorbis.  So far, this is
+something any of those GUI programs can do.  But maybe you don't want
+to convert your lossy formats into oggs, lest the gods of information
+theory smite you for your transcoding wickedness.  Well, no problem.
+This converts any wav, flac, or wv files found into ogg, but copies
+the rest without modification:
 
-* FIXME (list of requirements)
+    Lossfully.generate '~/share/music/' => '~/share/music_lossy' do 
+      encode :lossless => '.ogg'
+    end 
 
-Install
--------
+But maybe this new library is going on your portable device, so you
+can't take all of your music and you need to shrink some of the lossy
+files, too.  How about just taking the songs from a playlist, and
+reencoding the lossy files that have an average bitrate over 192 kbps:
 
-* FIXME (sudo gem install, anything else)
+    Lossfully.generate '~/share/music/awesome.m3u' => '~/share/music_lossy' do 
+      encode :lossless => ['.ogg', 4] # use quality 4 for the encoding
+      encode [:lossy, 192] => ['.ogg', 4]
+    end 
 
-Author
-------
+You see, where this is going, right?  Maybe something like:
 
-Original author: FIXME (author's name)
+    Lossfully.generate '~/share/music/awesome.m3u' => '~/share/music_lossy' do 
+      clobber :rename
+      threads 2
+      remove_missing true
 
-Contributors:
+      skip /\.cue/
+      skip /\.jpg/
 
-* FIXME (contributor 1?)
-* FIXME (contributor 2?)
+      encode :lossless => 'flac'
+      encode [:ogg, 192] => ['.ogg', 4]
+      encode [:mp3, 300] => ['.mp3', -192.2]
+      encode :lossy => 'ogg'
+    end 
 
-License
--------
+For more details, check out the documentation of Lossfully::Generator.
 
-(The MIT License) FIXME (different license?)
+== Requirements
 
-Copyright (c) 2011 FIXME (author's name)
+* A copy of sox must be found in your path, which is what actually
+  does the transcoding.  There is currently no check to see if your
+  version of sox is compiled with LAME (support for MP3s, etc).  When
+  confronted with audio files that sox can't handle, Lossfully might
+  treat them as nonaudio files, skip them silently, or crash.  Who
+  knows.
 
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-'Software'), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
+* Lots of audio files.
 
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
+== Install
 
-THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+* gem install lossfully
+
+== Author
+
+Original author: Don March <don@ohspite.net>
+
+== License
+
+Copyright (C) 2011 Don March.
+
+Licensed under the GNU General Public License. 
+
+Lossfully is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the
+Free Software Foundation, either version 3 of the License, or (at your
+option) any later version.
+ 
+Lossfully is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see
+<http://www.gnu.org/licenses/>.

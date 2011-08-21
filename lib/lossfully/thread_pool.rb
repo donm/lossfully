@@ -1,5 +1,27 @@
+#--
+# Copyright (C) 2011 Don March
+#
+# This file is part of Lossfully.
+#
+# Lossfully is free software: you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#  
+# Lossfully is distributed in the hope that it will be useful, but
+# WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see
+# <http://www.gnu.org/licenses/>.
+#++
+
 require 'thread'
 require 'timeout'
+
+module Lossfully
 
 # There's (at least) two ways to do this: 1) the Ruby Recipes way,
 # which is to make a thread for every incoming task, but put it to
@@ -10,17 +32,16 @@ require 'timeout'
 # for the sake of sending signals with ConditionVaribles, but if those
 # signals aren't received there would be a delay of at most 1 second.
 #
-# Another uses thing about this implementation is for the case when
+# Another useful thing about this implementation is for the case when
 # every task you anticipate adding to the ThreadPool of the same
 # general form.  Then then ThreadPool can be initialized with a block
 # and you can just add objects to the task queue.
 #
-module Lossfully
   class ThreadPool
 
     DEFAULT_BLOCK = lambda {|block, &blk| block = blk if block_given? ; block.call}
 
-    def initialize(max_size = 2, block=nil, &blk)
+    def initialize(max_size = 1, block=nil, &blk)
       @running = true
       @joining = false
       
