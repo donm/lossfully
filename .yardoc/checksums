@@ -1,7 +1,0 @@
-version.txt f62edb585d9eb6e6b8908d6b40928474a13a7eeb
-bin/lossfully 3b498b052172829b36156b7f667581c90ee9fb66
-lib/lossfully.rb 9fdb9c6528b951a5ba4e79a1f6c74d9463b12e8f
-test/data/text.txt d8e28729935a537ba98342fff41cbcd39879e386
-lib/lossfully/audiofile.rb 902c4bc6b8683aa59ff79facb056fe17450b4147
-lib/lossfully/transcoding.rb 9d264d2a9b56f4bdfcf277c33922ceaedcda2fd6
-lib/lossfully/thread_pool.rb 89d4e165feb34e6ae0ba48573bf950602ec7df81

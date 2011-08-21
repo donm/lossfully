@@ -13,10 +13,10 @@ Bones do
   name     'lossfully'
   authors  'Don'
   email    'don@ohspite.net'
-  url      'FIXME (project homepage)'
+  url      'https://github.com/ohspite/lossfully'
   history_file 'CHANGELOG'
-  readme_file  'README'
-  rdoc.main    'README'
+  readme_file  'README.rdoc'
+  rdoc.main    'README.rdoc'
   summary 'Smartly generate transcoded (lossy or not) versions of your main music library.'
   description 'Smartly generate transcoded (lossy or not) versions of your main music library.'
 
